@@ -12,6 +12,10 @@
 
 ## 快速开始
 
+### 方式一：永久安装（推荐）
+
+安装后每次启动 Claude Code 自动加载，无需额外参数。
+
 ```bash
 # 1. 克隆并构建
 git clone https://github.com/wohaixiao-qds/claude-i18n.git
@@ -19,7 +23,20 @@ cd claude-i18n
 npm install
 npm run build
 
-# 2. 启动 Claude Code 并加载插件
+# 2. 添加为本地 marketplace
+claude plugin marketplace add /path/to/claude-i18n --scope user
+
+# 3. 从 marketplace 安装插件
+claude plugin install claude-i18n@claude-i18n --scope user
+```
+
+安装完成后，直接启动 `claude` 即可自动加载双语插件。
+
+### 方式二：临时加载
+
+仅当前会话生效，每次启动需要重新指定。
+
+```bash
 claude --plugin-dir /path/to/claude-i18n
 ```
 

@@ -1,12 +1,19 @@
 {
-  "name": "claude-i18n-marketplace",
-  "description": "Local marketplace for claude-i18n plugin",
+  "name": "claude-i18n",
+  "owner": {
+    "name": "wohaixiao-qds"
+  },
+  "metadata": {
+    "description": "Claude Code 中英双语汉化插件",
+    "version": "0.1.0"
+  },
   "plugins": [
     {
       "name": "claude-i18n",
       "source": "./",
       "description": "Claude Code 中英双语汉化插件 - 提供双语显示、中文命令和翻译技能",
-      "version": "0.1.0"
+      "category": "language",
+      "tags": ["i18n", "chinese", "translation", "bilingual"]
     }
   ]
 }
