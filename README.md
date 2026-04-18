@@ -7,6 +7,7 @@
 - SessionStart 自动注入双语系统提示，Claude 所有回复自动中英双语
 - PostToolUse Hook 自动翻译 Bash 工具的英文输出为双语
 - 1100+ 条预置翻译词条，支持模糊匹配
+- **动态收集** — 自动收集未翻译的英文短语，下次会话自动翻译并写入用户词典，越用越全
 - 提供中文命令集（`/翻译`、`/解释`、`/审查` 等）
 - 一键开关，默认开启
 
@@ -115,6 +116,18 @@ claude-i18n/
 1. **SessionStart Hook** — 会话启动时注入系统提示，指示 Claude 用中英双语格式回复
 2. **PostToolUse Hook** — Bash 工具执行后，将英文输出翻译为中文并与原文一起显示
 3. **翻译引擎** — 加载 zh-CN.json 和 en-US.json，构建反向映射，支持精确匹配和模糊替换
+4. **动态收集** — 翻译失败时自动提取未翻译的英文片段存入 pending，下次会话启动时 Claude 自动翻译并写入用户词典
+
+### 动态收集流程
+
+```
+Bash 输出 → 翻译尝试 → 提取未翻译片段 → pending-translations.json
+                                                  ↓
+                    用户词典更新 ← Claude 自动翻译 ← SessionStart 读取 pending
+```
+
+- `~/.claude/plugins/config/claude-i18n/pending-translations.json` — 待翻译条目
+- `~/.claude/plugins/config/claude-i18n/user-dictionary.json` — 用户词典（优先级高于内置词条）
 
 ## 开发
 

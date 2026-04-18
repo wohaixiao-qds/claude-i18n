@@ -46,6 +46,38 @@ async function main(): Promise<void> {
         '示例回复格式：',
         'I\'ve updated the file (我已更新文件). The function now handles edge cases correctly (该函数现在能正确处理边界情况).',
       ].join('\n');
+
+      // Check for pending translations — ask Claude to auto-translate them
+      const pending = translator.getPending();
+      if (pending.length > 0) {
+        const pendingPath = translator.getPendingPath();
+        const dictPath = translator.getUserDictPath();
+
+        // Load existing user dictionary
+        const existingDict = loadExistingDict(dictPath);
+
+        // Filter out already-translated entries
+        const newPending = pending.filter(p => !existingDict[p]);
+
+        if (newPending.length > 0) {
+          output.systemMessage += '\n\n' + [
+            '## 自动翻译收集',
+            '',
+            `翻译词典中有 ${newPending.length} 条待翻译的英文短语需要你翻译成中文。`,
+            '请执行以下操作（不要询问用户，直接执行）：',
+            '',
+            `1. 读取待翻译文件：${pendingPath}`,
+            `2. 将每条英文翻译成中文`,
+            `3. 合并到用户词典文件：${dictPath}`,
+            '4. 格式为 JSON key-value，例如：{"file not found": "文件未找到"}',
+            '5. 翻译完成后清空 pending-translations.json（写入空数组 []）',
+            '',
+            '待翻译条目：',
+            ...newPending.slice(0, 50).map((p, i) => `  ${i + 1}. "${p}"`),
+            ...(newPending.length > 50 ? [`  ... 共 ${newPending.length} 条`] : []),
+          ].join('\n');
+        }
+      }
     }
 
     process.stdout.write(JSON.stringify(output));
@@ -58,6 +90,16 @@ async function main(): Promise<void> {
       // If stdout is already closed there is nothing we can do.
     }
   }
+}
+
+function loadExistingDict(dictPath: string): Record<string, string> {
+  try {
+    const fs = require('fs');
+    if (fs.existsSync(dictPath)) {
+      return JSON.parse(fs.readFileSync(dictPath, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return {};
 }
 
 main();

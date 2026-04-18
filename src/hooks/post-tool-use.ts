@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { translator } from '../translator';
 import { configManager } from '../config';
-import { Config, HookInput, HookOutput } from '../types';
+import { HookInput, HookOutput } from '../types';
 import { readStdin } from '../utils';
 
 function processHook(hookInput: HookInput): HookOutput {
@@ -48,11 +48,18 @@ function processBashOutput(input: HookInput): string | undefined {
     originalOutput,
     'zh-CN',
     'en-US',
-    'translated-first',
+    'original-first',
   );
   if (bilingual === originalOutput) {
+    // No translation found — collect for future learning
+    translator.collectUntranslated(originalOutput, originalOutput);
     return undefined;
   }
+
+  // Collect untranslated segments from partial translations
+  const translated = translator.translate(originalOutput, 'zh-CN');
+  translator.collectUntranslated(originalOutput, translated);
+
   return bilingual;
 }
 

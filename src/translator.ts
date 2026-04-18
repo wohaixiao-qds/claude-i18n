@@ -1,17 +1,27 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { Translations, TranslationMap } from './types';
 
 const TRANSLATIONS_DIR = path.join(__dirname, '..', 'translations');
+const USER_DATA_DIR = path.join(os.homedir(), '.claude', 'plugins', 'config', 'claude-i18n');
+const USER_DICT_FILE = path.join(USER_DATA_DIR, 'user-dictionary.json');
+const PENDING_FILE = path.join(USER_DATA_DIR, 'pending-translations.json');
 
 export class Translator {
   private translations: Map<string, Translations> = new Map();
   private reverseMaps: Map<string, TranslationMap> = new Map();
   // Cached sorted pairs per target language for fuzzy matching
   private cachedPairs: Map<string, { original: string; translated: string }[]> = new Map();
+  // User dictionary: English → Chinese (higher priority than built-in)
+  private userDict: Map<string, string> = new Map();
+  // Pending: texts collected but not yet translated
+  private pending: Set<string> = new Set();
 
   constructor() {
     this.loadTranslations();
+    this.loadUserDictionary();
+    this.loadPending();
   }
 
   private loadTranslations(): void {
@@ -31,6 +41,190 @@ export class Translator {
           console.error(`加载翻译文件 ${file} 失败:`, e);
         }
       }
+    }
+  }
+
+  private loadUserDictionary(): void {
+    try {
+      if (fs.existsSync(USER_DICT_FILE)) {
+        const content = fs.readFileSync(USER_DICT_FILE, 'utf-8');
+        const data = JSON.parse(content);
+        for (const [key, value] of Object.entries(data)) {
+          if (typeof value === 'string' && value) {
+            this.userDict.set(key, value);
+          }
+        }
+      }
+    } catch {
+      // User dict is optional, ignore errors
+    }
+  }
+
+  private loadPending(): void {
+    try {
+      if (fs.existsSync(PENDING_FILE)) {
+        const content = fs.readFileSync(PENDING_FILE, 'utf-8');
+        const arr = JSON.parse(content);
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            if (typeof item === 'string' && item.trim()) {
+              this.pending.add(item);
+            }
+          }
+        }
+      }
+    } catch {
+      // Pending file is optional
+    }
+  }
+
+  /** Get pending translations (for session-start to instruct Claude) */
+  getPending(): string[] {
+    return Array.from(this.pending);
+  }
+
+  /** Get the path to user-dictionary.json (for Claude to write translations) */
+  getUserDictPath(): string {
+    return USER_DICT_FILE;
+  }
+
+  /** Get the path to pending-translations.json */
+  getPendingPath(): string {
+    return PENDING_FILE;
+  }
+
+  /** Clear pending after they've been translated */
+  clearPending(translated: string[]): void {
+    for (const t of translated) {
+      this.pending.delete(t);
+    }
+    this.savePending();
+  }
+
+  /**
+   * After a translation attempt, collect untranslated segments.
+   * Compares original vs translated to find what wasn't translated.
+   */
+  collectUntranslated(original: string, translated: string): void {
+    // Skip short text
+    if (original.trim().length < 5) return;
+    // Skip if already has Chinese (already translated or Chinese source)
+    if (/[\u4e00-\u9fff]/.test(original)) return;
+    // Skip if it's in user dict already
+    if (this.userDict.has(original)) return;
+
+    const segments = this.extractUntranslatedSegments(original, translated);
+    let added = false;
+
+    for (const seg of segments) {
+      const trimmed = seg.trim();
+      // Only collect meaningful English segments
+      if (trimmed.length >= 5 && !this.pending.has(trimmed) && !this.userDict.has(trimmed)) {
+        // Skip if it's just a path, number, or code
+        if (/^[\d\s\-_.\/\\:]+$/.test(trimmed)) continue;
+        // Skip if it looks like a file path
+        if (/^(\/|\.\/|\.\.\/|~\/|[A-Z]:\\)/.test(trimmed)) continue;
+        this.pending.add(trimmed);
+        added = true;
+      }
+    }
+
+    if (added) {
+      this.savePending();
+    }
+  }
+
+  /**
+   * Extract English segments that weren't translated from a partially translated result.
+   */
+  private extractUntranslatedSegments(original: string, translated: string): string[] {
+    const segments: string[] = [];
+
+    if (original === translated) {
+      // Completely untranslated — try splitting into meaningful parts
+      // Split by lines first
+      const lines = original.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      for (const line of lines) {
+        if (line.length <= 80 && /^[a-zA-Z]/.test(line)) {
+          segments.push(line);
+        } else if (line.length > 80) {
+          // Long lines: split by sentence-ending punctuation
+          const sentences = line.split(/(?<=[.:;!?])\s+/);
+          for (const s of sentences) {
+            const st = s.trim();
+            if (st.length >= 5 && /^[a-zA-Z]/.test(st)) {
+              segments.push(st);
+            }
+          }
+        }
+      }
+      // If nothing extracted, add the whole thing if short enough
+      if (segments.length === 0 && original.trim().length <= 200) {
+        segments.push(original.trim());
+      }
+    } else {
+      // Partially translated — find English-only chunks
+      // Split by Chinese characters and common delimiters
+      const parts = translated.split(/[\u4e00-\u9fff…]+/);
+      for (const part of parts) {
+        const trimmed = part.trim().replace(/^[:;,\s]+|[:;,\s]+$/g, '');
+        if (trimmed.length >= 5 && /^[a-zA-Z]/.test(trimmed)) {
+          segments.push(trimmed);
+        }
+      }
+
+      // Also check the original for phrases not present in any form
+      // Split original into words/phrases and find untranslated ones
+      const words = original.split(/\s+/);
+      let currentPhrase = '';
+      for (const word of words) {
+        // Skip common words that don't need translation
+        if (['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+             'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+             'would', 'shall', 'should', 'may', 'might', 'must', 'can',
+             'could', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by',
+             'from', 'as', 'into', 'through', 'during', 'before', 'after',
+             'above', 'below', 'between', 'out', 'off', 'over', 'under',
+             'again', 'further', 'then', 'once', 'and', 'but', 'or', 'nor',
+             'not', 'so', 'yet', 'both', 'either', 'neither', 'each',
+             'every', 'all', 'any', 'few', 'more', 'most', 'other', 'some',
+             'such', 'no', 'only', 'own', 'same', 'than', 'too', 'very',
+             'just', 'because', 'if', 'when', 'where', 'how', 'what',
+             'which', 'who', 'whom', 'this', 'that', 'these', 'those',
+             'it', 'its'].includes(word.toLowerCase())) {
+          currentPhrase += (currentPhrase ? ' ' : '') + word;
+          continue;
+        }
+        // Check if this word/phrase was translated
+        const testPhrase = currentPhrase ? currentPhrase + ' ' + word : word;
+        const testTranslated = this.fuzzyTranslate(testPhrase, 'zh-CN');
+        if (testTranslated === testPhrase) {
+          // Not translated
+          currentPhrase = testPhrase;
+        } else {
+          if (currentPhrase.length >= 5 && !this.pending.has(currentPhrase)) {
+            segments.push(currentPhrase);
+          }
+          currentPhrase = '';
+        }
+      }
+      if (currentPhrase.length >= 5 && !this.pending.has(currentPhrase)) {
+        segments.push(currentPhrase);
+      }
+    }
+
+    return segments;
+  }
+
+  private savePending(): void {
+    try {
+      if (!fs.existsSync(USER_DATA_DIR)) {
+        fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+      }
+      const arr = Array.from(this.pending);
+      fs.writeFileSync(PENDING_FILE, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch {
+      // Best effort
     }
   }
 
@@ -67,19 +261,20 @@ export class Translator {
 
   /**
    * 翻译文本到目标语言
-   * @param text 原文
-   * @param toLang 目标语言
-   * @param fromLang 源语言（可选，自动检测）
    */
   translate(text: string, toLang: string, fromLang?: string): string {
     const targetTranslation = this.translations.get(toLang);
     if (!targetTranslation) return text;
 
-    // 先尝试按键查找
+    // 1. Check user dictionary first (highest priority)
+    const userTrans = this.userDict.get(text);
+    if (userTrans) return userTrans;
+
+    // 2. Try direct key lookup
     const directTranslation = this.getNestedValue(targetTranslation, text);
     if (directTranslation) return directTranslation;
 
-    // 尝试从其他语言的反向映射中找到键
+    // 3. Try reverse map lookup
     if (fromLang) {
       const sourceReverse = this.reverseMaps.get(fromLang);
       if (sourceReverse && sourceReverse[text]) {
@@ -88,7 +283,6 @@ export class Translator {
         if (translated) return translated;
       }
     } else {
-      // 遍历所有语言的反向映射
       for (const [lang, reverseMap] of this.reverseMaps) {
         if (lang === toLang) continue;
         if (reverseMap[text]) {
@@ -99,14 +293,13 @@ export class Translator {
       }
     }
 
-    // 模糊匹配 - 尝试翻译部分文本
+    // 4. Fuzzy match (includes user dict entries)
     return this.fuzzyTranslate(text, toLang);
   }
 
   /**
    * Build and cache sorted translation pairs for a given target language.
-   * Looks up ALL reverse maps (not just en-US) to find original strings
-   * for each translated value.
+   * Includes BOTH built-in translations and user dictionary entries.
    */
   private getSortedPairs(toLang: string): { original: string; translated: string }[] {
     const cached = this.cachedPairs.get(toLang);
@@ -117,11 +310,11 @@ export class Translator {
 
     const allPairs: { original: string; translated: string }[] = [];
 
+    // Built-in translations
     const collect = (obj: any, prefix = '') => {
       for (const [key, value] of Object.entries(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
         if (typeof value === 'string') {
-          // Look up ALL reverse maps to find the original text for this key
           for (const [lang, reverseMap] of this.reverseMaps) {
             if (lang === toLang) continue;
             for (const [srcText, srcKey] of Object.entries(reverseMap)) {
@@ -138,6 +331,11 @@ export class Translator {
     };
 
     collect(targetTranslation);
+
+    // Add user dictionary entries
+    for (const [english, chinese] of this.userDict) {
+      allPairs.push({ original: english, translated: chinese });
+    }
 
     // Sort by original length descending (prefer replacing longer matches first)
     allPairs.sort((a, b) => b.original.length - a.original.length);
@@ -175,18 +373,10 @@ export class Translator {
     return result;
   }
 
-  /**
-   * Preserve the original text's casing when applying the translated word.
-   * - ALL CAPS -> apply translated as-is (no case concept in CJK)
-   * - Title Case -> capitalized match (for non-CJK targets)
-   * - lower case -> as-is
-   */
   private preserveCase(original: string, replacement: string): string {
     if (original === original.toUpperCase() && original.length > 1) {
-      // Original is ALL CAPS — no case transformation needed for CJK
       return replacement;
     }
-    // For CJK replacements, casing doesn't apply; return as-is
     return replacement;
   }
 
@@ -196,10 +386,6 @@ export class Translator {
 
   /**
    * 生成双语显示文本
-   * @param text 原始文本
-   * @param primaryLang 目标翻译语言（将文本翻译成此语言）
-   * @param _secondaryLang 未使用，保留以兼容接口
-   * @param order 显示顺序：original-first 为原文在前，translated-first 为译文在前
    */
   getBilingualText(text: string, primaryLang: string, _secondaryLang: string, order: 'original-first' | 'translated-first'): string {
     const translated = this.translate(text, primaryLang);
