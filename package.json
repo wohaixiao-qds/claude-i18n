@@ -1,0 +1,36 @@
+{
+  "name": "claude-i18n",
+  "version": "0.1.0",
+  "description": "Claude Code 中英双语汉化插件 - 提供双语显示、中文命令和翻译技能",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "node scripts/validate-build.js",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "files": [
+    "commands/",
+    "skills/",
+    ".claude-plugin/",
+    "translations/",
+    "dist/",
+    "hooks/"
+  ],
+  "keywords": [
+    "claude-code",
+    "i18n",
+    "chinese",
+    "translation",
+    "中文",
+    "翻译",
+    "bilingual"
+  ],
+  "author": "wohaixiao-qds",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "typescript": "^5.9.3"
+  }
+}

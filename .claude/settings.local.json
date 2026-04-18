@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x *)",
+      "Bash(npm run *)",
+      "Bash(node *)",
+      "Bash(npm install *)",
+      "Skill(update-config)",
+      "Bash(mv setup.md i18n-setup.md)",
+      "Bash(mv toggle-lang.md i18n-toggle.md)",
+      "Bash(mv extract.md i18n-extract.md)",
+      "Bash(cp -r /Users/zhangyu/CodeDevelopment/claude-i18n/.claude-plugin /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/)",
+      "Bash(cp -r /Users/zhangyu/CodeDevelopment/claude-i18n/commands /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/)",
+      "Bash(cp -r /Users/zhangyu/CodeDevelopment/claude-i18n/dist /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/)",
+      "Bash(cp -r /Users/zhangyu/CodeDevelopment/claude-i18n/translations /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/)",
+      "Bash(cp /Users/zhangyu/CodeDevelopment/claude-i18n/package.json /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/)",
+      "Bash(cp *)",
+      "Skill(claude-hud:setup)",
+      "Bash(command -v bun)",
+      "Bash(command -v node)",
+      "Bash(bash *)",
+      "WebSearch",
+      "mcp__plugin_ecc_exa__web_search_exa",
+      "Read(//Users/zhangyu/.claude/plugins/**)",
+      "Read(//Users/zhangyu/.claude/**)",
+      "Bash(rm -rf /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/dist)",
+      "Bash(rm -rf /Users/zhangyu/.claude/plugins/cache/local-marketplace/claude-i18n/0.1.0/translations)",
+      "Bash(claude plugin *)",
+      "Bash(head *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('commands', 'NO COMMANDS'\\), indent=2\\)[:2000]\\)\")",
+      "Bash(claude /plugin install /Users/zhangyu/CodeDevelopment/claude-i18n)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ]
+}

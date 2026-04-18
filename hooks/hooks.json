@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "script": "../dist/hooks/session-start.js",
+      "type": "command"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "script": "../dist/hooks/post-tool-use.js",
+      "type": "command"
+    }
+  ]
+}

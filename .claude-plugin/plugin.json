@@ -1,0 +1,57 @@
+{
+  "name": "claude-i18n",
+  "description": "Claude Code 中英双语汉化插件 - 提供双语显示、中文命令和翻译技能",
+  "version": "0.1.0",
+  "author": {
+    "name": "wohaixiao-qds"
+  },
+  "commands": [
+    "./commands/i18n-setup.md",
+    "./commands/i18n-toggle.md",
+    "./commands/i18n-extract.md",
+    "./commands/翻译.md",
+    "./commands/解释.md",
+    "./commands/审查.md",
+    "./commands/中文注释.md"
+  ],
+  "skills": [
+    "./skills/代码审查-中文/SKILL.md",
+    "./skills/中文编程助手/SKILL.md",
+    "./skills/中英翻译/SKILL.md"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/session-start.js"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/post-tool-use.js"
+          }
+        ]
+      }
+    ]
+  },
+  "homepage": "https://github.com/wohaixiao-qds/claude-i18n",
+  "repository": "https://github.com/wohaixiao-qds/claude-i18n",
+  "license": "MIT",
+  "keywords": [
+    "i18n",
+    "chinese",
+    "translation",
+    "中文",
+    "翻译",
+    "bilingual"
+  ]
+}
